@@ -1,0 +1,11 @@
+#Dependencies
+node_modules
+
+#Database
+db/*.ts
+
+#Environment
+.env
+.env.test
+
+dist
