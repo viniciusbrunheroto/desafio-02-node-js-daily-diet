@@ -10,17 +10,6 @@ export async function mealsRoutes(app: FastifyInstance) {
       preHandler: [checkSessionIdExists]
     }, async (req,res) =>{
 
-      const sessionId = req.cookies.sessionId
-
-      const user = await knex('users')
-        .where('session_id', sessionId)
-        .first()
-
-      if (!user) {
-        return res.status(404).send({error: 'User not found'})
-      }
-
-
       const createMealBodySchema = z.object({
         name: z.string(),
         description: z.string(),
@@ -36,7 +25,7 @@ export async function mealsRoutes(app: FastifyInstance) {
         description,
         datetime: datetime.getTime(),
         diet,
-        user_id: user.id,
+        user_id: req.user?.id,
       })
 
       return res.status(201).send()
@@ -64,21 +53,9 @@ export async function mealsRoutes(app: FastifyInstance) {
       const { name, description, datetime, diet } = getMealBodySchema.parse(req.body)
 
 
-      const { sessionId}  = req.cookies
-
-      const user = await knex('users')
-        .where('session_id', sessionId)
-        .first()
-
-      if (!user) {
-        return res.status(404).send({error: 'User not found'})
-      }
-
-
       const meal = await knex('meals')
         .where({
           id,
-          user_id: user.id,
         })
         .first()
 
@@ -89,7 +66,6 @@ export async function mealsRoutes(app: FastifyInstance) {
 
       await knex('meals').where({
         id,
-        user_id: user.id,
       }).update({
         name,
         description,
@@ -97,27 +73,17 @@ export async function mealsRoutes(app: FastifyInstance) {
         datetime: datetime.getTime()
       })
 
-      return res.status(200).send()
+      return res.status(204).send()
     }),
 
   app.get('/', {
     preHandler: [checkSessionIdExists]
   }, async( req, res) => {
 
-    const {sessionId} = req.cookies
-
-    const user = await knex('users')
-      .where('session_id', sessionId)
-      .first()
-
-
-    if (!user) {
-      return res.status(404).send({error: 'User not found'})
-    }
 
     const meals = await knex('meals')
       .select('*')
-      .where('user_id', user.id)
+      .where('user_id', req.user?.id)
 
     return {meals}
 
@@ -133,21 +99,9 @@ export async function mealsRoutes(app: FastifyInstance) {
 
     const { id } = getMealParamsSchema.parse(req.params)
 
-
-    const { sessionId}  = req.cookies
-
-    const user = await knex('users')
-      .where('session_id', sessionId)
-      .first()
-
-    if (!user) {
-      return res.status(404).send({error: 'User not found'})
-    }
-
     const meal = await knex('meals')
       .where({
-        user_id: user.id,
-        id
+        id,
       })
       .first()
 
@@ -170,20 +124,16 @@ export async function mealsRoutes(app: FastifyInstance) {
 
     const { id } = getMealParamsSchema.parse(req.params)
 
+    const meal = await knex('meals').where({
+      id,
+    }).first()
 
-    const { sessionId}  = req.cookies
-
-    const user = await knex('users')
-      .where('session_id', sessionId)
-      .first()
-
-    if (!user) {
-      return res.status(404).send({error: 'User not found'})
+    if (!meal) {
+      return res.status(404).send({error: 'Meal not found'})
     }
 
     await knex('meals')
       .where({
-        user_id: user.id,
         id
       })
       .delete()
@@ -196,23 +146,13 @@ export async function mealsRoutes(app: FastifyInstance) {
     preHandler: [checkSessionIdExists]
   } , async(req, res) => {
 
-    const { sessionId}  = req.cookies
-
-    const user = await knex('users')
-      .where('session_id', sessionId)
-      .first()
-
-    if (!user) {
-      return res.status(404).send({error: 'User not found'})
-    }
-
     const totalMeals = await knex('meals')
-      .where('user_id', user.id)
+      .where('user_id', req.user?.id)
       .orderBy('datetime', 'desc')
 
     const totalMealsInDiet = await knex('meals')
       .where({
-        user_id: user.id,
+        user_id: req.user?.id,
         diet: true,
       })
       .count('id', {as: 'total'})
@@ -220,7 +160,7 @@ export async function mealsRoutes(app: FastifyInstance) {
 
     const totalMealsOffDiet = await knex('meals')
       .where({
-        user_id: user.id,
+        user_id: req.user?.id,
         diet: false,
       })
       .count('id', {as: 'total'})
@@ -244,13 +184,13 @@ export async function mealsRoutes(app: FastifyInstance) {
     )
 
 
-    return {
+    return res.send({
       TotalMeals: totalMeals,
       TotalMealsInDiet: totalMealsInDiet?.total,
       TotalMealsOffDiet: totalMealsOffDiet?.total,
       BestSequence: bestSequence
 
-    }
+    })
 
   })
 
